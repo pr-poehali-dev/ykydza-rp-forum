@@ -12,6 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
 
+interface Comment {
+  id: number;
+  postId: number;
+  author: string;
+  content: string;
+  timestamp: string;
+  likes: number;
+}
+
 interface Post {
   id: number;
   title: string;
@@ -39,6 +48,16 @@ const Index = () => {
   const [createPostOpen, setCreatePostOpen] = useState(false);
   const [adminAction, setAdminAction] = useState<'ban' | 'delete' | 'filter' | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [viewCommentsPost, setViewCommentsPost] = useState<Post | null>(null);
+  const [newComment, setNewComment] = useState('');
+  
+  const [allComments, setAllComments] = useState<Comment[]>([
+    { id: 1, postId: 1, author: 'Player123', content: 'Спасибо за правила! Очень понятно написано', timestamp: '1 день назад', likes: 8 },
+    { id: 2, postId: 1, author: 'GamerPro', content: 'Можно добавить пункт про РП в чате?', timestamp: '1 день назад', likes: 5 },
+    { id: 3, postId: 2, author: 'Player123', content: 'Круто! Когда можно будет зайти и посмотреть?', timestamp: '4 часа назад', likes: 12 },
+    { id: 4, postId: 2, author: 'ProGamer', content: 'Отличное обновление, ждем еще!', timestamp: '3 часа назад', likes: 15 },
+    { id: 5, postId: 3, author: 'Администратор', content: 'Попробуйте переустановить клиент и проверьте файрволл', timestamp: '30 минут назад', likes: 3 }
+  ]);
   
   const [posts, setPosts] = useState<Post[]>([
     {
@@ -130,6 +149,45 @@ const Index = () => {
       variant: 'destructive'
     });
     setAdminAction(null);
+  };
+
+  const handleAddComment = () => {
+    if (!newComment.trim() || !viewCommentsPost) return;
+    
+    const comment: Comment = {
+      id: allComments.length + 1,
+      postId: viewCommentsPost.id,
+      author: isAdmin ? 'Администратор' : 'Player123',
+      content: newComment,
+      timestamp: 'только что',
+      likes: 0
+    };
+    
+    setAllComments([...allComments, comment]);
+    setPosts(posts.map(p => p.id === viewCommentsPost.id ? {...p, comments: p.comments + 1} : p));
+    setNewComment('');
+    
+    toast({
+      title: '✅ Комментарий добавлен',
+      description: 'Ваш комментарий опубликован'
+    });
+  };
+
+  const handleDeleteComment = (commentId: number) => {
+    const comment = allComments.find(c => c.id === commentId);
+    if (!comment) return;
+    
+    setAllComments(allComments.filter(c => c.id !== commentId));
+    setPosts(posts.map(p => p.id === comment.postId ? {...p, comments: Math.max(0, p.comments - 1)} : p));
+    
+    toast({
+      title: '🗑️ Комментарий удален',
+      description: 'Комментарий был удален'
+    });
+  };
+
+  const getPostComments = (postId: number) => {
+    return allComments.filter(c => c.postId === postId);
   };
 
   const filteredPosts = posts.filter(p => p.section === activeSection);
@@ -274,7 +332,10 @@ const Index = () => {
                         <Icon name="ThumbsUp" size={16} />
                         {post.likes}
                       </button>
-                      <button className="flex items-center gap-1 hover:text-secondary transition-colors">
+                      <button 
+                        className="flex items-center gap-1 hover:text-secondary transition-colors"
+                        onClick={() => setViewCommentsPost(post)}
+                      >
                         <Icon name="MessageSquare" size={16} />
                         {post.comments}
                       </button>
@@ -348,7 +409,10 @@ const Index = () => {
                         <Icon name="ThumbsUp" size={16} />
                         {post.likes}
                       </button>
-                      <button className="flex items-center gap-1 hover:text-secondary transition-colors">
+                      <button 
+                        className="flex items-center gap-1 hover:text-secondary transition-colors"
+                        onClick={() => setViewCommentsPost(post)}
+                      >
                         <Icon name="MessageSquare" size={16} />
                         {post.comments}
                       </button>
@@ -410,7 +474,10 @@ const Index = () => {
                         <Icon name="ThumbsUp" size={16} />
                         {post.likes}
                       </button>
-                      <button className="flex items-center gap-1 hover:text-secondary transition-colors">
+                      <button 
+                        className="flex items-center gap-1 hover:text-secondary transition-colors"
+                        onClick={() => setViewCommentsPost(post)}
+                      >
                         <Icon name="MessageSquare" size={16} />
                         {post.comments}
                       </button>
@@ -776,6 +843,99 @@ const Index = () => {
               Сохранить
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewCommentsPost !== null} onOpenChange={() => setViewCommentsPost(null)}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] bg-card border-border overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="MessageSquare" size={20} />
+              Комментарии
+            </DialogTitle>
+            <DialogDescription>
+              {viewCommentsPost?.title}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto space-y-4 py-4">
+            {viewCommentsPost && getPostComments(viewCommentsPost.id).length === 0 ? (
+              <div className="text-center py-8">
+                <Icon name="MessageCircle" size={48} className="mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground">Пока нет комментариев</p>
+                <p className="text-sm text-muted-foreground mt-1">Станьте первым, кто оставит комментарий!</p>
+              </div>
+            ) : (
+              viewCommentsPost && getPostComments(viewCommentsPost.id).map(comment => (
+                <div key={comment.id} className="p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-all bg-card/50">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                          {comment.author.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-sm">{comment.author}</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Icon name="Clock" size={12} />
+                          {comment.timestamp}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {isAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDeleteComment(comment.id)}
+                        className="hover:bg-destructive/20 hover:text-destructive h-8 w-8 p-0"
+                      >
+                        <Icon name="Trash2" size={14} />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <p className="text-sm mb-3">{comment.content}</p>
+                  
+                  <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors">
+                    <Icon name="ThumbsUp" size={14} />
+                    {comment.likes}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="border-t border-border pt-4 mt-4">
+            <div className="space-y-3">
+              <Label htmlFor="new-comment">Ваш комментарий</Label>
+              <Textarea 
+                id="new-comment"
+                placeholder="Напишите комментарий..."
+                rows={3}
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                className="resize-none"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => {
+                  setViewCommentsPost(null);
+                  setNewComment('');
+                }}>
+                  Закрыть
+                </Button>
+                <Button 
+                  onClick={handleAddComment}
+                  disabled={!newComment.trim()}
+                  className="gradient-primary hover:opacity-90"
+                >
+                  <Icon name="Send" size={16} className="mr-2" />
+                  Отправить
+                </Button>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
